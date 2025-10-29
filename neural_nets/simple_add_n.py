@@ -3,7 +3,7 @@
 
 This script builds a single linear neuron (`nn.Linear(1, 1)`) and trains it with
 mean squared error to recover a constant-offset mapping of the form y = x + c.
-The toy dataset is produced by `make_inputs_and_targets()`; with the current
+The toy dataset is produced by `make_input_and_output_features()`; with the current
 settings it creates 100 points and an offset c = target_start - input_start.
 The program runs a short training loop (Adam) and prints learned parameters,
 loss, predictions, and a simple visualization.
@@ -16,107 +16,142 @@ import torch.nn as nn
 torch.manual_seed(0)
 device = torch.device("mps")
 
+offset = 2
 
-def make_inputs_and_targets():
-    input_start = 10
-    target_start = input_start + 10
-    count = 100
-    step = 1
 
-    inputs = (
-        torch.arange(input_start, input_start + count, step=step, dtype=torch.float32)
-        .unsqueeze(1)
-        .to(device)
-    )
-    targets = (
-        torch.arange(target_start, target_start + count, step=step, dtype=torch.float32)
+def make_training_input_and_output_features():
+    start = 0
+    end = 100
+
+    inputs = torch.arange(start, end, dtype=torch.float32).unsqueeze(1).to(device)
+    outputs = (
+        torch.arange(start + offset, end + offset, dtype=torch.float32)
         .unsqueeze(1)
         .to(device)
     )
 
-    return inputs, targets
+    return inputs, outputs  # i.e. y = x + offset
 
 
-def main() -> None:
-    # 1) Build the dataset on the chosen device (MPS here for Apple Silicon)
+def make_test_input_and_output_features():
+    num_points: torch.Number = 100
 
-    inputs, targets = make_inputs_and_targets()
-    offset = (targets[0] - inputs[0]).item()
+    x = torch.linspace(
+        0.0, 2.0 * torch.pi, steps=num_points, dtype=torch.float32, device=device
+    )
+    inputs = torch.cos(x).unsqueeze(1)
+    outputs = (torch.cos(x) + offset).unsqueeze(1)
 
-    # 2) Define a simple model: a single linear neuron y = w*x + b
-    nn_linear = nn.Linear(1, 1)
-    linear_model = nn.Sequential(nn_linear).to(device)
+    return inputs, outputs, x.tolist()
+
+
+def train_linear_model(inputs: torch.Tensor, targets: torch.Tensor) -> nn.Sequential:
+    """Fit a 1D linear model y = w·x + b to map inputs → targets.
+
+    A linear (affine) model transforms an input x by scaling it with a
+    learnable weight w and then shifting by a learnable bias b: y_hat = w*x + b.
+    With `nn.Linear(1, 1)` we have exactly two learnable parameters (w and b)
+    that define this straight line. Training adjusts these parameters so that
+    predictions y_hat match targets as closely as possible.
+    """
+
+    learning_rate = 0.1
+    num_steps = 400
+
+    # This layer implements the affine function y_hat = w*x + b with learnable
+    # parameters w (weight) and b (bias). For in_features=1 and out_features=1,
+    # it is the classic 1D linear regression model.
+    model = nn.Sequential(nn.Linear(1, 1)).to(device)
 
     # Initialize near the expected solution to make convergence obvious
     with torch.no_grad():
-        linear_model[0].weight.fill_(1.0)
-        linear_model[0].bias.zero_()
+        model[0].weight.fill_(1.0)
+        model[0].bias.zero_()
 
-    # 3) Choose a loss function and optimizer
-    loss_function = nn.MSELoss()  # mean squared error loss function
-    optimizer = torch.optim.Adam(linear_model.parameters(), lr=0.1)  # Adam optimizer
+    # Mean Squared Error (MSE) is the average of squared differences between
+    # predictions and targets: MSE = mean((y_hat - y)^2). Squaring emphasizes
+    # larger errors and yields a smooth objective for gradient descent.
+    loss_fn = nn.MSELoss()
 
-    # 4) Training loop: forward -> loss -> backward -> step
-    for _ in range(500):
-        optimizer.zero_grad()  # reset gradients
-        predictions = linear_model(inputs)  # forward pass
-        loss = loss_function(predictions, targets)  # compute loss
+    # Optimizer: algorithm that updates parameters using gradients. Adam adapts
+    # per-parameter learning rates based on running estimates of the first and
+    # second moments of gradients (mean and uncentered variance). This often
+    # converges faster and more robustly than plain SGD.
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
+
+    for _ in range(num_steps):
+        # 1) Reset accumulated gradients from the previous step
+        optimizer.zero_grad()
+
+        # 2) Forward pass: compute predictions y_hat = w*x + b
+        predictions = model(inputs)
+
+        # 3) Compute loss (how far predictions are from targets)
+        loss = loss_fn(predictions, targets)
+
+        # 4) Numerical safety check: if loss becomes NaN/Inf (non-finite),
+        #    abort the loop to avoid propagating invalid values.
         if not torch.isfinite(loss):
             break
-        loss.backward()  # backward pass
-        optimizer.step()  # update parameters
 
-    # 5) Inspect learned parameters and predictions
+        # 5) Backward pass: compute gradients via automatic differentiation
+        loss.backward()
 
-    with torch.no_grad():
-        new_inputs, _ = make_inputs_and_targets()
-        predictions = linear_model(new_inputs).squeeze()
+        # 6) Update parameters (w, b) using Adam
+        optimizer.step()
 
-    predictions_list = predictions.tolist()
+    return model
 
-    learned_weight = linear_model[0].weight.item()
-    learned_bias = linear_model[0].bias.item()
 
-    print(
-        {
-            "learned_weight": learned_weight,
-            "learned_bias": learned_bias,
-            "expected_bias": offset,
-            "loss": round(float(loss.item()), 6),
-        }
-    )
+def plot_results(
+    x: list[float],
+    test_input_features: torch.Tensor,
+    test_output_features: torch.Tensor,
+    test_predictions: torch.Tensor,
+) -> None:
+    target_input_features_list = test_input_features.detach().cpu().squeeze().tolist()
+    target_output_features_list = test_output_features.detach().cpu().squeeze().tolist()
+    test_predictions_list = test_predictions.detach().cpu().tolist()
 
-    print("preds:", predictions_list)
-
-    # 7) Simple visualization (requires matplotlib)
-    # Move tensors to CPU and convert to lists for plotting
-
-    plt.figure(figsize=(6, 4))
-    plt.title(f"Learning y = x + {offset:.0f} (Linear Model)")
-    plt.xlabel("x")
+    plt.figure(figsize=(7, 4))
+    plt.title("Test domain: target vs prediction over x ∈ [0, 2π]")
+    plt.xlabel("x (radians)")
     plt.ylabel("y")
 
-    # Prepare simple Python lists for plotting
-    inputs_list = inputs.squeeze().tolist()
-    targets_list = targets.squeeze().tolist()
-
-    # Ground truth points (targets)
-    plt.scatter(inputs_list, targets_list, label="target", color="tab:blue")
-    # Model predictions
     plt.plot(
-        inputs_list,
-        predictions_list,
-        label="prediction",
-        color="tab:orange",
-        marker="o",
+        x, target_input_features_list, label="target inputs (cos(x))", color="tab:green"
     )
-    # Also show the raw inputs (identity mapping y = x) for context
     plt.plot(
-        inputs_list, inputs_list, label="input (y=x)", color="tab:green", linestyle="--"
+        x,
+        target_output_features_list,
+        label="target outputs (cos(x)+offset)",
+        color="tab:blue",
+    )
+    plt.scatter(
+        x, test_predictions_list, label="predictions", color="tab:orange", marker="x"
     )
     plt.legend()
     plt.tight_layout()
     plt.show()
+
+
+def main() -> None:
+    # 1) Build the dataset on the chosen device (MPS here for Apple Silicon)
+    training_input_features, training_output_features = (
+        make_training_input_and_output_features()
+    )
+
+    # 2) Train a simple model: a single linear neuron y = w*x + b
+    model = train_linear_model(training_input_features, training_output_features)
+
+    # 3) Test the model on a new dataset
+    test_input_features, test_output_features, x = make_test_input_and_output_features()
+
+    with torch.no_grad():
+        test_predictions = model(test_input_features).squeeze()
+
+    # 4) Graph the results
+    plot_results(x, test_input_features, test_output_features, test_predictions)
 
 
 if __name__ == "__main__":
