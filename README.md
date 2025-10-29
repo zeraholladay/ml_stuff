@@ -1,6 +1,39 @@
 # ml_stuff
 
-A notebook of common ML tasks.
+A notebook of ML concepts.
+
+## Venv setup
+
+```bash
+python3 -mvenv .venv
+. .venv/bin/activate
+pip install -r requirements.txt
+```
+
+## Tokenization
+
+This repo contains a minimal example at `tokenizer/simple_hugging_face.py` that demonstrates text tokenization using Hugging Face Transformers.
+
+### What is tokenization?
+- **Tokenization** converts raw text into integer IDs that models can process.
+- Modern LLMs use **subword tokenizers** (e.g., WordPiece/BPE), breaking words into pieces to balance vocabulary size and coverage (e.g., "unbelievable" → "un", "##bel", "##ievable").
+
+### Key concepts shown in `simple_hugging_face.py`
+- **AutoTokenizer.from_pretrained("bert-base-uncased")**: loads the matching tokenizer config, vocabulary, and rules (lowercasing for uncased models).
+- **Encoding**: `tok(input_text, return_tensors="pt")` returns a dictionary (PyTorch tensors) including:
+  - `input_ids`: token IDs after subword tokenization (with special tokens added).
+  - `attention_mask`: 1 where tokens are real, 0 where padding is present.
+  - `token_type_ids` (for some models): segment IDs (e.g., sentence A/B in BERT).
+- **Special tokens**: models may add tokens like `[CLS]` (start) and `[SEP]` (separator) automatically.
+- **Padding & truncation** (not enabled by default here):
+  - `padding=True` pads shorter sequences to the same length.
+  - `truncation=True` clips longer texts to the model’s max length.
+- **Decoding**: you can map IDs back to text via `tokenizer.decode(input_ids)` (useful for inspection).
+
+### How to run the example
+- Run: `python tokenizer/simple_hugging_face.py`
+- It prints the original text and the tokenized outputs (PyTorch tensors).
+
 
 ## Linear Regression: The Simplest Neural Network
 
@@ -39,6 +72,6 @@ See `neural_nets/simple_add_n.py` for a complete, commented example that:
   - Trains a 1D linear layer with Mean Squared Error (MSE) loss and the Adam optimizer,
   - Evaluates on a test domain and visualizes the results.
 
-The model is trained constant-offset mapping of the form y = x + c. It is then tested for cos(x) target vs prediction over x ∈ [0, 2π].
+The model is trained constant-offset mapping of the form y = x + 2. It is then tested for cos(x) target vs prediction cos(x) + 2 over x ∈ [0, 2π].
 
 ![Linear Regression](./docs/img/simple_add_n.png)
