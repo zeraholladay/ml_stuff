@@ -9,12 +9,21 @@ The program runs a short training loop (Adam) and prints learned parameters,
 loss, predictions, and a simple visualization.
 """
 
+import os
+import sys
+
 import matplotlib.pyplot as plt
 import torch
 import torch.nn as nn
 
 torch.manual_seed(0)
-device = torch.device("mps")
+
+# Allow importing project root config when running this script directly
+try:
+    from config import device
+except ModuleNotFoundError:
+    sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+    from config import device
 
 offset = 2
 

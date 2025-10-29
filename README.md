@@ -2,7 +2,7 @@
 
 A notebook of ML concepts.
 
-## Venv setup
+### Setup:
 
 ```bash
 python3 -mvenv .venv
@@ -10,9 +10,41 @@ python3 -mvenv .venv
 pip install -r requirements.txt
 ```
 
+## Tensors
+
+Tensors are the **fundamental data structure** used in modern machine learning, particularly in frameworks like PyTorch and TensorFlow.
+
+Simply put, a tensor is a **container** that holds data, almost always **numerical data**, and is typically a generalization of matrices to an arbitrary number of dimensions.
+
+## Tensors as Data Containers
+
+You can think of a tensor as a multi-dimensional array or an N-dimensional grid of numbers. The "rank" or "order" of the tensor refers to the number of dimensions it has.
+
+Here's how common data structures relate to tensors:
+
+| Rank (Order) | Name | Description | Example |
+| :---: | :--- | :--- | :--- |
+| **0** | **Scalar** | A single number. | Temperature ($25$) |
+| **1** | **Vector** | A list of numbers (a 1D array). | Coordinates ($[3, 5, 8]$) |
+| **2** | **Matrix** | A rectangular grid of numbers (a 2D array). | A grayscale image (Height $\times$ Width) |
+| **3** | **3D Tensor** | A cube or stack of matrices. | A color image (Height $\times$ Width $\times$ Color Channels) |
+| **4+** | **N-D Tensor** | Used for batches of data or sequential data. | A batch of color images (Batch Size $\times$ Height $\times$ Width $\times$ Channels) |
+
+## Why Tensors are Essential in ML
+
+Tensors are more than just data storage; they are the primary medium for **mathematical operations** and **gradient computation** in neural networks.
+
+1.  **Uniform Representation:** Tensors allow data of all types—from raw input (like text, images, or audio) to weights and biases within a model, to the output predictions—to be represented in a **consistent mathematical structure**.
+2.  **GPU Acceleration:** Tensors are designed to be efficiently stored in contiguous memory blocks, making them highly suitable for processing by **GPUs** (Graphics Processing Units). GPUs are optimized for the massive parallel calculations (like matrix multiplications) required to train large neural networks.
+3.  **Automatic Differentiation:** In frameworks like PyTorch, tensors are linked to a computational graph. This enables **automatic differentiation** (or Autograd), which is the process of automatically calculating the gradients required for the backpropagation algorithm during model training. Every tensor tracks its history of operations, allowing the framework to determine how to adjust the model's weights to minimize error. 
+
+In summary, a tensor is the universal, multi-dimensional numeric data structure that makes the training of deep learning models mathematically consistent and computationally efficient.
+
 ## Tokenization
 
 This repo contains a minimal example at `tokenizer/simple_hugging_face.py` that demonstrates text tokenization using Hugging Face Transformers.
+
+See [https://tiktokenizer.vercel.app/](Tiktokenizer) too.
 
 ### What is tokenization?
 - **Tokenization** converts raw text into integer IDs that models can process.
